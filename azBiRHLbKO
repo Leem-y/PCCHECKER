@@ -5,8 +5,8 @@ $customMessage = @"
 |   :    \  /   /   \          /   /   \    ,--,  | :  ,'  .' | /   /   \ ,---,': / '  ,'  .' |\    /  \   
 |   |  .\ :|   :     :        |   :     :,---.'|  : ',---.'   ||   :     ::   : '/ / ,---.'   |;   :    \  
 .   :  |: |.   |  ;. /        .   |  ;. /|   | : _' ||   |   .'.   |  ;. /|   '   ,  |   |   .'|   | .\ :  
-|   |   \ :.   ; /--`         .   ; /--` :   : |.'  |:   :  |-,.   ; /--` '   |  /   :   :  |-,.   : |: |  
-|   : .   /;   | ;            ;   | ;    |   ' '  ; ::   |  ;/|;   | ;    |   ;  ;   :   |  ;/||   |  \ :  
+|   |   \ :.   ; /--`         .   ; /--` :   : |.'  |:   :  |-,.   ; /--` '   |  /   :   |  ;/||   |  \ :  
+|   : .   /;   | ;            ;   | ;    |   ' '  ; ::   |  ;/|;   | ;    |   ;  ;   :   |  ;/||   | ;\  \ 
 ;   | |`-' |   : |            |   : |    '   |  .'. ||   :   .'|   : |    :   '   \  |   :   .'|   : .  /  
 |   | ;    .   | '___         .   | '___ |   | :  | '|   |  |-,.   | '___ |   |    ' |   |  |-,;   | |  \  
 :   ' |    '   ; : .'|        '   ; : .'|'   : |  : ;'   :  ;/|'   ; : .'|'   : |.  \'   :  ;/||   | ;\  \ 
@@ -36,7 +36,11 @@ $searchDirectories = @(
     "C:\Windows\Temp",
     [System.IO.Path]::Combine($env:USERPROFILE, "AppData\Local\Temp"),
     "C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Startup",
-    [System.IO.Path]::Combine($env:USERPROFILE, "AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup")
+    [System.IO.Path]::Combine($env:USERPROFILE, "AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup"),
+    "C:\Drivers",
+    "C:\Configuration",
+    "C:\Windows\System32\drivers",
+    "C:\Windows\SysWOW64\drivers"
 )
 
 $registryPaths = @(
@@ -44,7 +48,8 @@ $registryPaths = @(
     "HKLM:\Software\Microsoft\Windows\CurrentVersion\Run",
     "HKCU:\Software\Microsoft\Windows\CurrentVersion\RunOnce",
     "HKLM:\Software\Microsoft\Windows\CurrentVersion\RunOnce",
-    "HKLM:\Software\Microsoft\Windows\CurrentVersion\App Paths"
+    "HKLM:\Software\Microsoft\Windows\CurrentVersion\App Paths",
+    "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders"
 )
 
 function Get-ExePathsFromRegistry {
@@ -90,11 +95,32 @@ function Get-ExePathsFromRecycleBin {
     return $exePaths
 }
 
+function Search-DirectoryForExes {
+    param (
+        [string]$directory
+    )
+
+    $exePaths = @()
+    try {
+        $exeFiles = Get-ChildItem -Path $directory -Filter *.exe -Recurse -File -ErrorAction SilentlyContinue
+        foreach ($file in $exeFiles) {
+            $exePaths += [pscustomobject]@{
+                Path = $file.FullName
+                LastAccessTime = (Get-Item $file.FullName).LastAccessTime
+                RegistryKey = 'File System'
+            }
+        }
+    } catch {
+        Write-Output "Error accessing directory: $directory"
+    }
+    
+    return $exePaths
+}
+
 $exeFilesFromDirectories = @()
 foreach ($dir in $searchDirectories) {
     if (Test-Path $dir) {
-        $exeFilesFromDirectories += Get-ChildItem -Path $dir -Filter *.exe -Recurse -File -ErrorAction SilentlyContinue | 
-                                    Select-Object @{Name="Path"; Expression={$_.FullName}}, @{Name="LastAccessTime"; Expression={(Get-Item $_.FullName).LastAccessTime}}
+        $exeFilesFromDirectories += Search-DirectoryForExes -directory $dir
     }
 }
 
