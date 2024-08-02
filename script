@@ -1,0 +1,122 @@
+$filePath = "$env:USERPROFILE\Desktop\ExeFilesList.txt"
+New-Item -Path $filePath -ItemType File -Force | Out-Null
+
+$searchDirectories = @(
+    [System.IO.Path]::Combine($env:USERPROFILE, "Downloads"),
+    [System.IO.Path]::Combine($env:USERPROFILE, "Documents"),
+    [System.IO.Path]::Combine($env:USERPROFILE, "Desktop"),
+    [System.IO.Path]::Combine($env:USERPROFILE, "Pictures"),
+    "C:\Program Files",
+    "C:\Program Files (x86)",
+    [System.IO.Path]::Combine($env:USERPROFILE, "AppData\Local"),
+    [System.IO.Path]::Combine($env:USERPROFILE, "AppData\Roaming"),
+    "C:\Windows\System32",
+    "C:\Windows\SysWOW64",
+    "C:\Windows\Temp",
+    [System.IO.Path]::Combine($env:USERPROFILE, "AppData\Local\Temp"),
+    "C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Startup",
+    [System.IO.Path]::Combine($env:USERPROFILE, "AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup")
+)
+
+$registryPaths = @(
+    "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run",
+    "HKLM:\Software\Microsoft\Windows\CurrentVersion\Run",
+    "HKCU:\Software\Microsoft\Windows\CurrentVersion\RunOnce",
+    "HKLM:\Software\Microsoft\Windows\CurrentVersion\RunOnce",
+    "HKLM:\Software\Microsoft\Windows\CurrentVersion\App Paths"
+)
+
+function Get-ExePathsFromRegistry {
+    param (
+        [string]$regPath
+    )
+    
+    $exePaths = @()
+    
+    try {
+        $keys = Get-ItemProperty -Path $regPath -ErrorAction Stop
+        foreach ($key in $keys.PSObject.Properties) {
+            if ($key.Value -match "\.exe$") {
+                $exePaths += [pscustomobject]@{
+                    Path = $key.Value
+                    LastAccessTime = [datetime]::MinValue
+                    RegistryKey = $regPath
+                }
+            }
+        }
+    } catch {
+        Write-Output "Error accessing registry path: $regPath"
+    }
+    
+    return $exePaths
+}
+
+function Get-ExePathsFromRecycleBin {
+    $recycleBinPath = [System.IO.Path]::Combine([System.IO.Path]::GetPathRoot($env:SystemDrive), '$Recycle.Bin')
+    $exePaths = @()
+    
+    if (Test-Path $recycleBinPath) {
+        $recycleBinItems = Get-ChildItem -Path $recycleBinPath -Recurse -Filter *.exe -ErrorAction SilentlyContinue
+        foreach ($item in $recycleBinItems) {
+            $exePaths += [pscustomobject]@{
+                Path = $item.FullName
+                LastAccessTime = $item.LastWriteTime
+                RegistryKey = 'Recycle Bin'
+            }
+        }
+    }
+    
+    return $exePaths
+}
+
+$exeFilesFromDirectories = @()
+foreach ($dir in $searchDirectories) {
+    if (Test-Path $dir) {
+        $exeFilesFromDirectories += Get-ChildItem -Path $dir -Filter *.exe -Recurse -File -ErrorAction SilentlyContinue | 
+                                    Select-Object @{Name="Path"; Expression={$_.FullName}}, @{Name="LastAccessTime"; Expression={(Get-Item $_.FullName).LastAccessTime}}
+    }
+}
+
+$exeFilesFromRegistry = @()
+foreach ($regPath in $registryPaths) {
+    $exeFilesFromRegistry += Get-ExePathsFromRegistry -regPath $regPath
+}
+
+$exeFilesFromRecycleBin = Get-ExePathsFromRecycleBin
+
+$allExeFiles = $exeFilesFromDirectories + $exeFilesFromRegistry + $exeFilesFromRecycleBin
+
+$sortedExeFiles = $allExeFiles | Where-Object { $_.Path } | Sort-Object LastAccessTime -Descending
+
+$exeFilesContent = $sortedExeFiles | Select-Object Path, LastAccessTime, RegistryKey |
+                    Format-Table -AutoSize | Out-String
+
+Set-Content -Path $filePath -Value "List of .exe files from specified directories, the registry, and the Recycle Bin sorted by most recent access time:`r`n`r`n$exeFilesContent"
+
+Start-Process $filePath
+
+# Clear the screen
+Clear-Host
+
+# Display custom message in red
+$customMessage = @"
+                                                                                                           
+,-.----.                                         ,--,                            ,--.                      
+\    /  \    ,----..            ,----..        ,--.'|    ,---,.  ,----..     ,--/  /|    ,---,.,-.----.    
+|   :    \  /   /   \          /   /   \    ,--,  | :  ,'  .' | /   /   \ ,---,': / '  ,'  .' |\    /  \   
+|   |  .\ :|   :     :        |   :     :,---.'|  : ',---.'   ||   :     ::   : '/ / ,---.'   |;   :    \  
+.   :  |: |.   |  ;. /        .   |  ;. /|   | : _' ||   |   .'.   |  ;. /|   '   ,  |   |   .'|   | .\ :  
+|   |   \ :.   ; /--`         .   ; /--` :   : |.'  |:   :  |-,.   ; /--` '   |  /   :   :  |-,.   : |: |  
+|   : .   /;   | ;            ;   | ;    |   ' '  ; ::   |  ;/|;   | ;    |   ;  ;   :   |  ;/||   |  \ :  
+;   | |`-' |   : |            |   : |    '   |  .'. ||   :   .'|   : |    :   '   \  |   :   .'|   : .  /  
+|   | ;    .   | '___         .   | '___ |   | :  | '|   |  |-,.   | '___ |   |    ' |   |  |-,;   | |  \  
+:   ' |    '   ; : .'|        '   ; : .'|'   : |  : ;'   :  ;/|'   ; : .'|'   : |.  \'   :  ;/||   | ;\  \ 
+:   : :    '   | '/  :        '   | '/  :|   | '  ,/ |   |    \'   | '/  :|   | '_\.'|   |    \:   ' | \.' 
+|   | :    |   :    /         |   :    / ;   : ;--'  |   :   .'|   :    / '   : |    |   :   .':   : :-'   
+`---'.|     \   \ .'           \   \ .'  |   ,/      |   | ,'   \   \ .'  ;   |,'    |   | ,'  |   |.'     
+  `---`      `---`              `---`    '---'       `----'      `---`    '---'      `----'    `---'       
+                                                                                                           
+"@
+
+Write-Host $customMessage -ForegroundColor Red
+Read-Host -Prompt "Press Enter to exit"
