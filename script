@@ -1,3 +1,24 @@
+$customMessage = @"
+                                                                                                           
+,-.----.                                         ,--,                            ,--.                      
+\    /  \    ,----..            ,----..        ,--.'|    ,---,.  ,----..     ,--/  /|    ,---,.,-.----.    
+|   :    \  /   /   \          /   /   \    ,--,  | :  ,'  .' | /   /   \ ,---,': / '  ,'  .' |\    /  \   
+|   |  .\ :|   :     :        |   :     :,---.'|  : ',---.'   ||   :     ::   : '/ / ,---.'   |;   :    \  
+.   :  |: |.   |  ;. /        .   |  ;. /|   | : _' ||   |   .'.   |  ;. /|   '   ,  |   |   .'|   | .\ :  
+|   |   \ :.   ; /--`         .   ; /--` :   : |.'  |:   :  |-,.   ; /--` '   |  /   :   :  |-,.   : |: |  
+|   : .   /;   | ;            ;   | ;    |   ' '  ; ::   |  ;/|;   | ;    |   ;  ;   :   |  ;/||   |  \ :  
+;   | |`-' |   : |            |   : |    '   |  .'. ||   :   .'|   : |    :   '   \  |   :   .'|   : .  /  
+|   | ;    .   | '___         .   | '___ |   | :  | '|   |  |-,.   | '___ |   |    ' |   |  |-,;   | |  \  
+:   ' |    '   ; : .'|        '   ; : .'|'   : |  : ;'   :  ;/|'   ; : .'|'   : |.  \'   :  ;/||   | ;\  \ 
+:   : :    '   | '/  :        '   | '/  :|   | '  ,/ |   |    \'   | '/  :|   | '_\.'|   |    \:   ' | \.' 
+|   | :    |   :    /         |   :    / ;   : ;--'  |   | ,'   \   \ .'  ;   |,'    |   | ,'  |   |.'     
+`---'.|     \   \ .'           \   \ .'  |   ,/      |   | ,'   \   \ .'  ;   |,'    |   | ,'  |   |.'     
+  `---`      `---`              `---`    '---'       `----'      `---`    '---'      `----'    `---'       
+                                                                                                           
+"@
+
+Write-Host $customMessage -ForegroundColor Red
+
 $filePath = "$env:USERPROFILE\Desktop\ExeFilesList.txt"
 New-Item -Path $filePath -ItemType File -Force | Out-Null
 
@@ -85,7 +106,6 @@ foreach ($regPath in $registryPaths) {
 $exeFilesFromRecycleBin = Get-ExePathsFromRecycleBin
 
 $allExeFiles = $exeFilesFromDirectories + $exeFilesFromRegistry + $exeFilesFromRecycleBin
-
 $sortedExeFiles = $allExeFiles | Where-Object { $_.Path } | Sort-Object LastAccessTime -Descending
 
 $exeFilesContent = $sortedExeFiles | Select-Object Path, LastAccessTime, RegistryKey |
@@ -95,28 +115,4 @@ Set-Content -Path $filePath -Value "List of .exe files from specified directorie
 
 Start-Process $filePath
 
-# Clear the screen
 Clear-Host
-
-# Display custom message in red
-$customMessage = @"
-                                                                                                           
-,-.----.                                         ,--,                            ,--.                      
-\    /  \    ,----..            ,----..        ,--.'|    ,---,.  ,----..     ,--/  /|    ,---,.,-.----.    
-|   :    \  /   /   \          /   /   \    ,--,  | :  ,'  .' | /   /   \ ,---,': / '  ,'  .' |\    /  \   
-|   |  .\ :|   :     :        |   :     :,---.'|  : ',---.'   ||   :     ::   : '/ / ,---.'   |;   :    \  
-.   :  |: |.   |  ;. /        .   |  ;. /|   | : _' ||   |   .'.   |  ;. /|   '   ,  |   |   .'|   | .\ :  
-|   |   \ :.   ; /--`         .   ; /--` :   : |.'  |:   :  |-,.   ; /--` '   |  /   :   :  |-,.   : |: |  
-|   : .   /;   | ;            ;   | ;    |   ' '  ; ::   |  ;/|;   | ;    |   ;  ;   :   |  ;/||   |  \ :  
-;   | |`-' |   : |            |   : |    '   |  .'. ||   :   .'|   : |    :   '   \  |   :   .'|   : .  /  
-|   | ;    .   | '___         .   | '___ |   | :  | '|   |  |-,.   | '___ |   |    ' |   |  |-,;   | |  \  
-:   ' |    '   ; : .'|        '   ; : .'|'   : |  : ;'   :  ;/|'   ; : .'|'   : |.  \'   :  ;/||   | ;\  \ 
-:   : :    '   | '/  :        '   | '/  :|   | '  ,/ |   |    \'   | '/  :|   | '_\.'|   |    \:   ' | \.' 
-|   | :    |   :    /         |   :    / ;   : ;--'  |   :   .'|   :    / '   : |    |   :   .':   : :-'   
-`---'.|     \   \ .'           \   \ .'  |   ,/      |   | ,'   \   \ .'  ;   |,'    |   | ,'  |   |.'     
-  `---`      `---`              `---`    '---'       `----'      `---`    '---'      `----'    `---'       
-                                                                                                           
-"@
-
-Write-Host $customMessage -ForegroundColor Red
-Read-Host -Prompt "Press Enter to exit"
