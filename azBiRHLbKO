@@ -47,6 +47,20 @@ $registryPaths = @(
     "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders"
 )
 
+# URL to the raw file on GitHub containing the excluded paths
+$excludedPathsUrl = "https://raw.githubusercontent.com/Leem-y/PCCHECKER/main/excludedpaths.txt"
+
+function Get-ExcludedPaths {
+    $excludedPaths = @()
+    try {
+        $response = Invoke-WebRequest -Uri $excludedPathsUrl -UseBasicP
+        $excludedPaths = $response.Content -split "`r`n" | Where-Object { $_ -ne "" }
+    } catch {
+        Write-Output "Error downloading or processing the excluded paths list."
+    }
+    return $excludedPaths
+}
+
 function Get-ExePathsFromRegistry {
     param (
         [string]$regPath
@@ -112,6 +126,8 @@ function Search-DirectoryForExes {
     return $exePaths
 }
 
+$excludedPaths = Get-ExcludedPaths
+
 $exeFilesFromDirectories = @()
 foreach ($dir in $searchDirectories) {
     if (Test-Path $dir) {
@@ -127,7 +143,11 @@ foreach ($regPath in $registryPaths) {
 $exeFilesFromRecycleBin = Get-ExePathsFromRecycleBin
 
 $allExeFiles = $exeFilesFromDirectories + $exeFilesFromRegistry + $exeFilesFromRecycleBin
-$sortedExeFiles = $allExeFiles | Where-Object { $_.Path } | Sort-Object LastAccessTime -Descending
+
+# Filter out the excluded paths
+$filteredExeFiles = $allExeFiles | Where-Object { $excludedPaths -notcontains $_.Path }
+
+$sortedExeFiles = $filteredExeFiles | Where-Object { $_.Path } | Sort-Object LastAccessTime -Descending
 
 $exeFilesContent = $sortedExeFiles | Select-Object Path, LastAccessTime, RegistryKey |
                     Format-Table -AutoSize | Out-String
@@ -135,5 +155,7 @@ $exeFilesContent = $sortedExeFiles | Select-Object Path, LastAccessTime, Registr
 Set-Content -Path $filePath -Value "List of .exe files from specified directories, the registry, and the Recycle Bin sorted by most recent access time:`r`n`r`n$exeFilesContent"
 
 Start-Process $filePath
+
+Clear-Host
 
 Clear-Host
