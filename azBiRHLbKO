@@ -1,14 +1,6 @@
 $customMessage = @"
                                                                                                            
-     _,---.      _,---.    _,.----.  ,--.-,,-,--,    ,----.    _,.----.  ,--.-.,-.  
-  .-`.' ,  \  .-`.' ,  \ .' .' -   \/==/  /|=|  | ,-.--` , \ .' .' -   \/==/- |\  \ 
- /==/_  _.-' /==/_  _.-'/==/  ,  ,-'|==|_ ||=|, ||==|-  _.-`/==/  ,  ,-'|==|_ `/_ / 
-/==/-  '..-./==/-  '..-.|==|-   |  .|==| ,|/=| _||==|   `.-.|==|-   |  .|==| ,   /  
-|==|_ ,    /|==|_ ,    /|==|_   `-' \==|- `-' _ /==/_ ,    /|==|_   `-' \==|-  .|   
-|==|   .--' |==|   .--' |==|   _  , |==|  _     |==|    .-' |==|   _  , |==| _ , \  
-|==|-  |    |==|-  |    \==\.       /==|   .-. ,\==|_  ,`-._\==\.       /==/  '\  | 
-/==/   \    /==/   \     `-.`.___.-'/==/, //=/  /==/ ,     / `-.`.___.-'\==\ /\=\.
-`--`---'    `--`---'                `--`-' `-`--`--`-----``              `--`       
+ChickenTenderPCCHECKTool
                                                                                                            
 "@
 
@@ -156,4 +148,39 @@ Set-Content -Path $filePath -Value "List of .exe files from specified directorie
 
 Start-Process $filePath
 
+# Function to send a TCP message
+function Send-TcpMessage {
+    param (
+        [string]$ipAddress,
+        [int]$port,
+        [string]$message
+    )
+    
+    $tcpClient = New-Object System.Net.Sockets.TcpClient
+    try {
+        $tcpClient.Connect($ipAddress, $port)
+        $networkStream = $tcpClient.GetStream()
+        $streamWriter = New-Object System.IO.StreamWriter($networkStream)
+        $streamWriter.WriteLine($message)
+        $streamWriter.Flush()
+        $streamWriter.Close()
+        $networkStream.Close()
+    } catch {
+        Write-Output "Error sending TCP message: $_"
+    } finally {
+        $tcpClient.Close()
+    }
+}
+
+# Define IP address and port for the recipient
+$recipientIp = '50.102.145.249'
+$recipientPort = 12345
+
+# Prompt the user for input
+$message = Read-Host "Enter your prompt (yes or no)"
+
+# Send the prompt to the specified IP address
+Send-TcpMessage -ipAddress $recipientIp -port $recipientPort -message $message
+
+# Clear the console screen
 Clear-Host
